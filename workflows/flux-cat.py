@@ -13,7 +13,7 @@ def main():
     pipe = make_flux_pipeline()
 
     for i in range(10):
-        image = generate_flux_image(pipe=pipe, prompt=prompt)
+        image = generate_flux_image(pipe=pipe, prompt=prompt, negative_prompt=negative)
         image.save(f"output/ai-{batch}-{i}.{random_hex8()}.png")
 
 
@@ -24,35 +24,34 @@ def random_hex8() -> str:
 def make_flux_pipeline() -> FluxPipeline:
     pipe = FluxPipeline.from_pretrained(
         "black-forest-labs/FLUX.1-dev",
-        torch_dtype=torch.bfloat16,  # Flux likes bf16
+        torch_dtype=torch.bfloat16,
     )
-    # You have 12 GB VRAM -> use CPU offload
+
     pipe.enable_sequential_cpu_offload()
-    # For more speed but higher VRAM use:
-    # pipe.enable_model_cpu_offload()
-    # or if you somehow have 24GB+:
-    # pipe.to("cuda")
+
     return pipe
 
 
 def generate_flux_image(
     pipe: FluxPipeline,
     prompt: str,
-    *,
-    seed: int = 0,
+    negative_prompt: str,
+    seed: int | None = None,
     width: int = 1024,
     height: int = 1024,
-    steps: int = 50,
-    guidance: float = 3.5,
+    steps: int = 20,
+    guidance: float = 4.5,
 ):
-    # For dev variant, 50 steps & ~3–4 CFG is typical. :contentReference[oaicite:5]{index=5}
-    generator = torch.Generator(device=pipe._execution_device).manual_seed(seed)
+    generator = torch.Generator(device=pipe._execution_device).manual_seed(
+        seed or new_seed()
+    )
 
     out = None
 
     with torch.inference_mode():
         out = pipe(
             prompt=prompt,
+            negative_prompt=negative_prompt,
             num_inference_steps=steps,
             guidance_scale=guidance,
             width=width,
