@@ -1,6 +1,6 @@
 # Virtual environments
 .venv
 
-chat
+chat/*
 !chat/.gitkeep
 !chat/README.md
