@@ -1,0 +1,20 @@
+---
+description: How to use uv and other tools managed by mise
+globs: 
+alwaysApply: true
+---
+
+# Using mise-managed tools
+
+This project uses mise to manage tool versions. The `uv` package manager is installed via mise.
+
+To run uv commands, use:
+
+```bash
+mise exec -- uv <command>
+```
+
+Examples:
+- `mise exec -- uv sync` - sync dependencies
+- `mise exec -- uv add <package>` - add a new dependency
+- `mise exec -- uv run <script>` - run a Python script

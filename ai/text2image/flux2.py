@@ -1,11 +1,11 @@
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
+from diffusers import Flux2Pipeline
 from PIL import Image
 from utils.seed import new_seed
 import torch
 
 
-def make_pipe(model: str = "black-forest-labs/FLUX.1-dev") -> FluxPipeline:
-    pipe = FluxPipeline.from_pretrained(
+def make_pipe(model: str = "black-forest-labs/FLUX.2-dev") -> Flux2Pipeline:
+    pipe = Flux2Pipeline.from_pretrained(
         model,
         torch_dtype=torch.bfloat16,
     )
@@ -16,9 +16,8 @@ def make_pipe(model: str = "black-forest-labs/FLUX.1-dev") -> FluxPipeline:
 
 
 def snap(
-    pipe: FluxPipeline,
+    pipe: Flux2Pipeline,
     prompt: str,
-    negative_prompt: str = "",
     seed: int = 0,
     width: int = 1024,
     height: int = 1024,
@@ -34,7 +33,6 @@ def snap(
     with torch.inference_mode():
         out = pipe(
             prompt=prompt,
-            negative_prompt=negative_prompt,
             num_inference_steps=steps,
             guidance_scale=guidance,
             width=width,
@@ -44,3 +42,4 @@ def snap(
         )
 
     return out.images[0]
+
