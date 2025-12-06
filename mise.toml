@@ -1,2 +1,5 @@
 [tools]
 uv = "latest"
+
+[env]
+PYTHONPATH = ".:$PYTHONPATH"

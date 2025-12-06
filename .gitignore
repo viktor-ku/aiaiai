@@ -1,6 +1,12 @@
+*pycache*
+
 # Virtual environments
 .venv
 
 chat/*
 !chat/.gitkeep
 !chat/README.md
+
+output
+!output/.gitkeep
+!output/README.md

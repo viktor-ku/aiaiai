@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "torch",
-  "diffusers[torch]",
+  # "diffusers[torch]",
+  "diffusers @ git+https://github.com/huggingface/diffusers",
   "transformers",
   "safetensors",
   "accelerate",

@@ -1,3 +1,4 @@
+from PIL.Image import Image
 import torch
 from diffusers import StableDiffusionXLPipeline
 from utils.seed import new_seed
@@ -30,7 +31,7 @@ def snap(
     height: int = 1024,
     steps: int = 20,
     guidance: float = 4.5,
-):
+) -> Image:
     generator = torch.Generator(device="cuda").manual_seed(
         new_seed() if seed == 0 else seed
     )
