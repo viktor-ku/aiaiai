@@ -10,3 +10,7 @@ chat/*
 output
 !output/.gitkeep
 !output/README.md
+
+input
+!input/.gitkeep
+!input/README.md
