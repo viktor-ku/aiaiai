@@ -19,4 +19,8 @@ dependencies = [
   # Pose extraction for ControlNet
   "controlnet-aux>=0.0.9",
   "peft>=0.18.0",
+  # Web server for daemons
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.32.1",
+  "python-multipart==0.0.20",
 ]
