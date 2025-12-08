@@ -2,7 +2,9 @@
 SDXL Text-to-Image Generation with Optional Pose Control and LoRA Support
 
 This module provides SDXL image generation with optional ControlNet-based pose copying
-and LoRA (Low-Rank Adaptation) fine-tuning support.
+and LoRA (Low-Rank Adaptation) inference support.
+
+For LoRA training, see ai.lora.sdxl module.
 
 Basic Usage (text-to-image):
     from ai.text2image.sdxl import make_pipe, snap
@@ -11,16 +13,16 @@ Basic Usage (text-to-image):
     image = snap(pipe, prompt="a woman in a red dress")
     image.save("output.png")
 
-With LoRA:
+With LoRA (trained via ai.lora.sdxl):
     from ai.text2image.sdxl import make_pipe, snap, load_lora
     
     # Load LoRA at pipeline creation
-    pipe = make_pipe(lora_path="output_lora_sdxl/lora_2025-12-07_143052")
+    pipe = make_pipe(lora_path="output/lora_2025-12-07_233755")
     image = snap(pipe, prompt="a woman in a red dress", lora_scale=0.8)
     
     # Or load LoRA after pipeline creation
     pipe = make_pipe()
-    load_lora(pipe, "output_lora_sdxl/lora_2025-12-07_143052")
+    load_lora(pipe, "output/lora_2025-12-07_233755")
     image = snap(pipe, prompt="a woman in a red dress", lora_scale=0.8)
 
 Pose-Copying Usage:
@@ -370,7 +372,7 @@ def load_lora(pipe: SDXLPipelines, lora_path: str | Path) -> None:
     """
     Load LoRA weights onto an existing pipeline.
 
-    This loads PEFT LoRA adapters trained with lora101.py or similar
+    This loads PEFT LoRA adapters trained with ai.lora.sdxl or similar
     onto the UNet. The LoRA modifies the model's style/aesthetics based on
     training data.
 
