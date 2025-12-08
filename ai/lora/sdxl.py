@@ -6,7 +6,7 @@ After training, use ai.text2image.sdxl to load and use the trained LoRA.
 
 Training Usage:
     from ai.lora.sdxl import TrainingConfig, train_lora_sdxl
-    
+
     # Configure training
     cfg = TrainingConfig(
         train_images_dir="data/images",
@@ -14,20 +14,20 @@ Training Usage:
         output_dir="output",
         num_epochs=10,
     )
-    
+
     # Train
     train_lora_sdxl(cfg)
 
 Inference Usage (after training):
     from ai.text2image.sdxl import make_pipe, snap
-    
+
     pipe = make_pipe(lora_path="output/lora_2025-12-07_233755")
     image = snap(pipe, prompt="a woman in a red dress", lora_scale=0.8)
 
 Dataset Format:
     - A folder with images, for example: data/images
     - A captions file in JSON lines format, for example: data/captions.jsonl
-    
+
     Each line in captions.jsonl should look like:
       {"file_name": "0001.png", "text": "warm pastel film like portrait, soft light"}
 """
@@ -35,7 +35,6 @@ Dataset Format:
 from __future__ import annotations
 
 import json
-import math
 import os
 import signal
 from dataclasses import dataclass
@@ -64,7 +63,7 @@ class TrainingConfig:
     # Base SDXL model on Hugging Face
     model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
 
-    # Your small aesthetic dataset
+    # Your dataset
     train_images_dir: str = "data/images"
     captions_file: str = "data/captions.jsonl"
 
@@ -407,7 +406,9 @@ def train_lora_sdxl(cfg: TrainingConfig):
     total_steps = cfg.num_epochs * len(dataloader)
 
     print_section("Starting training")
-    print(f"    Total steps:  {total_steps} ({len(dataloader)} batches x {cfg.num_epochs} epochs)")
+    print(
+        f"    Total steps:  {total_steps} ({len(dataloader)} batches x {cfg.num_epochs} epochs)"
+    )
     print(f"    LoRA params:  {sum(p.numel() for p in lora_params):,}")
     print("    Press Ctrl+C to stop early (weights will be saved)")
     print()
@@ -437,7 +438,9 @@ def train_lora_sdxl(cfg: TrainingConfig):
 
         # Save using PEFT's save method
         unet.save_pretrained(output_path)
-        print_summary(output_path, elapsed_minutes, len(dataloader.dataset), completed_epochs)
+        print_summary(
+            output_path, elapsed_minutes, len(dataloader.dataset), completed_epochs
+        )
         return output_path
 
     # Handle Ctrl+C gracefully
@@ -471,11 +474,11 @@ def train_lora_sdxl(cfg: TrainingConfig):
                     vae_dtype = pipe.vae.dtype
                     pipe.vae.to(torch.float32)
                     images_fp32 = images.float()
-                    
+
                     latents_dist = pipe.vae.encode(images_fp32).latent_dist
                     latents = latents_dist.sample()
                     latents = latents * pipe.vae.config.scaling_factor
-                    
+
                     # Cast VAE back to fp16 and latents to training dtype
                     pipe.vae.to(vae_dtype)
                     latents = latents.to(dtype)
@@ -510,7 +513,9 @@ def train_lora_sdxl(cfg: TrainingConfig):
                 add_time_ids = add_time_ids.repeat(latents.shape[0], 1)
 
                 # Predict the noise with UNet using autocast for mixed precision
-                with torch.amp.autocast("cuda", enabled=(cfg.mixed_precision == "fp16")):
+                with torch.amp.autocast(
+                    "cuda", enabled=(cfg.mixed_precision == "fp16")
+                ):
                     model_pred = pipe.unet(
                         noisy_latents,
                         timesteps,
@@ -527,7 +532,13 @@ def train_lora_sdxl(cfg: TrainingConfig):
                 # Check for NaN loss
                 if torch.isnan(loss) or torch.isinf(loss):
                     print(f"    Warning: NaN/Inf loss at step {step_idx}, skipping...")
-                    del latents, noise, noisy_latents, prompt_embeds, pooled_prompt_embeds
+                    del (
+                        latents,
+                        noise,
+                        noisy_latents,
+                        prompt_embeds,
+                        pooled_prompt_embeds,
+                    )
                     del add_time_ids, model_pred, loss
                     torch.cuda.empty_cache()
                     continue
@@ -553,13 +564,17 @@ def train_lora_sdxl(cfg: TrainingConfig):
 
                 if step_idx % 10 == 0:
                     pct = (step_idx / total_steps) * 100
-                    print(f"    [{pct:5.1f}%] Step {step_idx:4d}/{total_steps}  Loss: {loss_value:.4f}")
+                    print(
+                        f"    [{pct:5.1f}%] Step {step_idx:4d}/{total_steps}  Loss: {loss_value:.4f}"
+                    )
 
             if not interrupted:
                 completed_epochs = epoch + 1
                 epoch_duration = (datetime.now() - epoch_start).total_seconds()
                 avg_epoch_loss = epoch_loss / max(1, len(dataloader))
-                print(f"  ✓ Epoch {epoch + 1}/{cfg.num_epochs} done  |  Loss: {avg_epoch_loss:.4f}  |  Time: {epoch_duration:.1f}s")
+                print(
+                    f"  ✓ Epoch {epoch + 1}/{cfg.num_epochs} done  |  Loss: {avg_epoch_loss:.4f}  |  Time: {epoch_duration:.1f}s"
+                )
 
         # Save checkpoint (normal completion or after interrupt)
         save_checkpoint(is_interrupt=interrupted)
@@ -604,7 +619,9 @@ def print_config(cfg: TrainingConfig) -> None:
     print(f"    Device:       {cfg.device}")
 
 
-def print_summary(output_path: Path, elapsed_minutes: float, num_images: int, num_epochs: int) -> None:
+def print_summary(
+    output_path: Path, elapsed_minutes: float, num_images: int, num_epochs: int
+) -> None:
     """Print final training summary."""
     print()
     print("+" + "-" * 58 + "+")
@@ -612,7 +629,9 @@ def print_summary(output_path: Path, elapsed_minutes: float, num_images: int, nu
     print("+" + "-" * 58 + "+")
     print(f"|  Output:    {str(output_path):<44} |")
     print(f"|  Duration:  {elapsed_minutes:.1f} minutes{' ' * 37}|"[:60] + "|")
-    print(f"|  Images:    {num_images} images x {num_epochs} epochs{' ' * 30}|"[:60] + "|")
+    print(
+        f"|  Images:    {num_images} images x {num_epochs} epochs{' ' * 30}|"[:60] + "|"
+    )
     print("+" + "-" * 58 + "+")
     print()
 
@@ -628,4 +647,3 @@ if __name__ == "__main__":
     print_config(cfg)
 
     train_lora_sdxl(cfg)
-

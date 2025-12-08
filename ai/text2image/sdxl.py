@@ -8,18 +8,18 @@ For LoRA training, see ai.lora.sdxl module.
 
 Basic Usage (text-to-image):
     from ai.text2image.sdxl import make_pipe, snap
-    
+
     pipe = make_pipe()
     image = snap(pipe, prompt="a woman in a red dress")
     image.save("output.png")
 
 With LoRA (trained via ai.lora.sdxl):
     from ai.text2image.sdxl import make_pipe, snap, load_lora
-    
+
     # Load LoRA at pipeline creation
     pipe = make_pipe(lora_path="output/lora_2025-12-07_233755")
     image = snap(pipe, prompt="a woman in a red dress", lora_scale=0.8)
-    
+
     # Or load LoRA after pipeline creation
     pipe = make_pipe()
     load_lora(pipe, "output/lora_2025-12-07_233755")
@@ -27,13 +27,13 @@ With LoRA (trained via ai.lora.sdxl):
 
 Pose-Copying Usage:
     from ai.text2image.sdxl import make_pipe, snap, Pose
-    
+
     pipe = make_pipe()
-    
+
     # From a photo (pose will be extracted automatically)
     pose = Pose(image_path="/path/to/reference.jpg", source="photo", strength=1.0)
     image = snap(pipe, prompt="a woman in a red dress", pose=pose)
-    
+
     # From an existing pose map (skeleton image)
     pose = Pose(image_path="/path/to/pose_map.png", source="pose_map", strength=0.8)
     image = snap(pipe, prompt="a woman in a red dress", pose=pose)
@@ -55,7 +55,11 @@ warnings.filterwarnings("ignore", message=".*Defaulting to unsafe serialization.
 warnings.filterwarnings("ignore", message=".*upcast_vae.*is deprecated.*")
 
 import torch
-from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline, StableDiffusionXLPipeline
+from diffusers import (
+    ControlNetModel,
+    StableDiffusionXLControlNetPipeline,
+    StableDiffusionXLPipeline,
+)
 from PIL import Image as PILImageModule
 
 from utils.seed import new_seed
@@ -124,9 +128,13 @@ class Pose:
         if self.image is None and self.image_path is None:
             raise ValueError("Either 'image' or 'image_path' must be provided")
         if self.image is not None and self.image_path is not None:
-            raise ValueError("Only one of 'image' or 'image_path' should be provided, not both")
+            raise ValueError(
+                "Only one of 'image' or 'image_path' should be provided, not both"
+            )
         if not 0.0 <= self.strength <= 2.0:
-            raise ValueError(f"strength must be between 0.0 and 2.0, got {self.strength}")
+            raise ValueError(
+                f"strength must be between 0.0 and 2.0, got {self.strength}"
+            )
 
     def get_image(self) -> Image:
         """
@@ -193,7 +201,9 @@ class SDXLPipelines:
 
             from controlnet_aux import OpenposeDetector
 
-            self._pose_detector = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
+            self._pose_detector = OpenposeDetector.from_pretrained(
+                "lllyasviel/ControlNet"
+            )
         return self._pose_detector
 
 
@@ -237,7 +247,9 @@ def _prepare_conditioning_image(
 
     # Resize/crop to target dimensions
     if pose.resize_mode == "resize":
-        pose_image = pose_image.resize((width, height), PILImageModule.Resampling.LANCZOS)
+        pose_image = pose_image.resize(
+            (width, height), PILImageModule.Resampling.LANCZOS
+        )
     else:
         # Center crop
         pose_image = _center_crop(pose_image, width, height)
@@ -496,7 +508,9 @@ def snap(
             actual_pipe = pipe.base
 
     # Set up the generator with seed
-    generator = torch.Generator(device="cuda").manual_seed(new_seed() if seed == 0 else seed)
+    generator = torch.Generator(device="cuda").manual_seed(
+        new_seed() if seed == 0 else seed
+    )
 
     # Pass LoRA scale via cross_attention_kwargs instead of set_adapters
     # set_adapters fails with inference mode tensors

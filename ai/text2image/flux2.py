@@ -42,4 +42,3 @@ def snap(
         )
 
     return out.images[0]
-

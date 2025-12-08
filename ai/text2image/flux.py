@@ -5,20 +5,20 @@ This module provides Flux.1 image generation with optional ControlNet-based pose
 
 Basic Usage (text-to-image):
     from ai.text2image.flux import make_pipe, snap
-    
+
     pipe = make_pipe()
     image = snap(pipe, prompt="a woman in a red dress")
     image.save("output.png")
 
 Pose-Copying Usage:
     from ai.text2image.flux import make_pipe, snap, Pose
-    
+
     pipe = make_pipe(enable_pose=True)
-    
+
     # From a photo (pose will be extracted automatically)
     pose = Pose(image_path="/path/to/reference.jpg", source="photo", strength=1.0)
     image = snap(pipe, prompt="a woman in a red dress", pose=pose)
-    
+
     # From an existing pose map (skeleton image)
     pose = Pose(image_path="/path/to/pose_map.png", source="pose_map", strength=0.8)
     image = snap(pipe, prompt="a woman in a red dress", pose=pose)
@@ -109,9 +109,13 @@ class Pose:
         if self.image is None and self.image_path is None:
             raise ValueError("Either 'image' or 'image_path' must be provided")
         if self.image is not None and self.image_path is not None:
-            raise ValueError("Only one of 'image' or 'image_path' should be provided, not both")
+            raise ValueError(
+                "Only one of 'image' or 'image_path' should be provided, not both"
+            )
         if not 0.0 <= self.strength <= 2.0:
-            raise ValueError(f"strength must be between 0.0 and 2.0, got {self.strength}")
+            raise ValueError(
+                f"strength must be between 0.0 and 2.0, got {self.strength}"
+            )
 
     def get_image(self) -> Image:
         """
@@ -178,7 +182,9 @@ class FluxPipelines:
 
             from controlnet_aux import OpenposeDetector
 
-            self._pose_detector = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
+            self._pose_detector = OpenposeDetector.from_pretrained(
+                "lllyasviel/ControlNet"
+            )
         return self._pose_detector
 
 
@@ -222,7 +228,9 @@ def _prepare_conditioning_image(
 
     # Resize/crop to target dimensions
     if pose.resize_mode == "resize":
-        pose_image = pose_image.resize((width, height), PILImageModule.Resampling.LANCZOS)
+        pose_image = pose_image.resize(
+            (width, height), PILImageModule.Resampling.LANCZOS
+        )
     else:
         # Center crop
         pose_image = _center_crop(pose_image, width, height)
