@@ -14,3 +14,7 @@ output
 input
 !input/.gitkeep
 !input/README.md
+
+data
+!data/.gitkeep
+!data/README.md
