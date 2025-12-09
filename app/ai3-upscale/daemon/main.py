@@ -38,7 +38,7 @@ from PIL import Image
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from ai.upscaling.sdxl import UpscalerPipeline, make_pipe, upscale
+from ai.upscaling.sdxl import UpscalerPipeline, make_divisible, make_pipe, upscale
 
 # =============================================================================
 # Global State
@@ -191,11 +191,18 @@ async def upscale_image(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
 
+    # Pad image to dimensions divisible by 64 (required by SD upscaler VAE)
+    original_size = input_image.size
+    input_image = make_divisible(input_image, divisor=64)
+
     # Get pipeline
     pipe = pipelines[scale_int]
 
     # Log request
-    print(f"Upscaling {input_image.size[0]}×{input_image.size[1]} → ×{scale_int}")
+    if original_size != input_image.size:
+        print(f"Upscaling {original_size[0]}×{original_size[1]} (padded to {input_image.size[0]}×{input_image.size[1]}) → ×{scale_int}")
+    else:
+        print(f"Upscaling {input_image.size[0]}×{input_image.size[1]} → ×{scale_int}")
 
     # Upscale
     try:

@@ -115,6 +115,36 @@ def make_pipe(scale: Literal[2, 4] = 4) -> UpscalerPipeline:
 # =============================================================================
 
 
+def make_divisible(img: Image, divisor: int = 64) -> Image:
+    """
+    Resize image dimensions to be divisible by the given divisor.
+
+    SD upscaler models require specific dimension alignment for VAE encoding.
+    The x4 upscaler needs dimensions divisible by 64 to avoid tensor mismatches.
+
+    Args:
+        img: Input PIL Image.
+        divisor: The number dimensions must be divisible by (default 64).
+
+    Returns:
+        Image with dimensions divisible by divisor (resized if necessary).
+    """
+    w, h = img.size
+
+    # Calculate new dimensions divisible by divisor
+    new_w = (w // divisor) * divisor
+    new_h = (h // divisor) * divisor
+
+    # Ensure minimum size
+    new_w = max(new_w, divisor)
+    new_h = max(new_h, divisor)
+
+    if new_w != w or new_h != h:
+        return img.resize((new_w, new_h), PILImageModule.Resampling.LANCZOS)
+
+    return img
+
+
 def _load_image(image: Image | str | Path) -> Image:
     """
     Load and validate an input image.
@@ -123,7 +153,7 @@ def _load_image(image: Image | str | Path) -> Image:
         image: PIL Image, or path to an image file.
 
     Returns:
-        PIL Image in RGB mode.
+        PIL Image in RGB mode with dimensions divisible by 8.
 
     Raises:
         FileNotFoundError: If image path doesn't exist.
@@ -133,15 +163,18 @@ def _load_image(image: Image | str | Path) -> Image:
         path = Path(image)
         if not path.exists():
             raise FileNotFoundError(f"Image not found: {path}")
-        return PILImageModule.open(path).convert("RGB")
+        img = PILImageModule.open(path).convert("RGB")
+    else:
+        # Assume it's a PIL Image
+        try:
+            img = image.convert("RGB")
+        except AttributeError:
+            raise TypeError(
+                f"image must be a PIL Image or path, got {type(image).__name__}"
+            )
 
-    # Assume it's a PIL Image
-    try:
-        return image.convert("RGB")
-    except AttributeError:
-        raise TypeError(
-            f"image must be a PIL Image or path, got {type(image).__name__}"
-        )
+    # Ensure dimensions are divisible by 64 for VAE compatibility
+    return make_divisible(img, divisor=64)
 
 
 # =============================================================================
