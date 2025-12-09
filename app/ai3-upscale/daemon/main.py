@@ -12,10 +12,11 @@ Usage:
     python main.py --scale both       # Both (default)
 
 API:
-    POST /upscale      - Upscale an image
-    GET  /ping         - Health check
-    GET  /docs         - OpenAPI documentation
-    GET  /openapi.json - OpenAPI schema
+    POST /upscale           - Upscale an image
+    GET  /ping              - Health check
+    GET  /api/capabilities  - Available upscale methods
+    GET  /docs              - OpenAPI documentation
+    GET  /openapi.json      - OpenAPI schema
 """
 
 from __future__ import annotations
@@ -102,6 +103,12 @@ app.add_middleware(
 async def ping() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok"}
+
+
+@app.get("/api/capabilities")
+async def capabilities() -> dict[str, list[int]]:
+    """Return which upscale methods are available based on loaded models."""
+    return {"capabilities": sorted(pipelines.keys())}
 
 
 @app.post(

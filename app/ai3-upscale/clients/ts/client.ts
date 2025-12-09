@@ -12,6 +12,9 @@
  * // Health check
  * const status = await client.ping();
  *
+ * // Get available upscale methods
+ * const { capabilities } = await client.capabilities(); // e.g. [2, 4]
+ *
  * // Upscale an image
  * const file = new File([imageBytes], 'image.png', { type: 'image/png' });
  * const upscaled = await client.upscale(file, { scale: 4, prompt: 'high quality' });
@@ -37,6 +40,11 @@ export interface UpscaleOptions {
 /** Ping response */
 export interface PingResponse {
   status: string;
+}
+
+/** Capabilities response */
+export interface CapabilitiesResponse {
+  capabilities: (2 | 4)[];
 }
 
 /** API error response */
@@ -76,6 +84,21 @@ export class UpscaleClient {
    */
   async ping(): Promise<PingResponse> {
     const response = await fetch(`${this.baseUrl}/ping`);
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new UpscaleApiError(response.status, error.detail);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get available upscale capabilities
+   * @returns Available upscale methods (2 and/or 4)
+   */
+  async capabilities(): Promise<CapabilitiesResponse> {
+    const response = await fetch(`${this.baseUrl}/api/capabilities`);
 
     if (!response.ok) {
       const error: ApiError = await response.json();
