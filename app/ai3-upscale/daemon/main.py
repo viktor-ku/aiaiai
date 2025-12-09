@@ -26,7 +26,7 @@ import io
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -124,8 +124,8 @@ async def capabilities() -> dict[str, list[int]]:
 async def upscale_image(
     image: Annotated[UploadFile, File(description="Image file to upscale")],
     scale: Annotated[
-        Literal[2, 4], Form(description="Upscaling factor: 2 or 4")
-    ] = 4,
+        str, Form(description="Upscaling factor: 2 or 4")
+    ] = "4",
     prompt: Annotated[
         str, Form(description="Text prompt to guide upscaling")
     ] = "",
@@ -133,14 +133,14 @@ async def upscale_image(
         str, Form(description="Things to avoid in output")
     ] = "blurry, low quality, artifacts, noise",
     seed: Annotated[
-        int, Form(description="Random seed (0 = random)")
-    ] = 0,
+        str, Form(description="Random seed (0 = random)")
+    ] = "0",
     steps: Annotated[
-        int, Form(description="Number of denoising steps", ge=1, le=100)
-    ] = 20,
+        str, Form(description="Number of denoising steps (1-100)")
+    ] = "20",
     guidance: Annotated[
-        float, Form(description="Guidance scale", ge=0.0, le=20.0)
-    ] = 7.5,
+        str, Form(description="Guidance scale (0.0-20.0)")
+    ] = "7.5",
 ) -> Response:
     """
     Upscale an image using Stable Diffusion upscalers.
@@ -148,15 +148,40 @@ async def upscale_image(
     The ×4 upscaler is prompt-guided and produces higher quality results.
     The ×2 upscaler uses latent-space upscaling and is faster.
     """
+    # Parse numeric params from form strings
+    try:
+        scale_int = int(scale)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="scale must be an integer")
+
+    try:
+        seed_int = int(seed)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="seed must be an integer")
+
+    try:
+        steps_int = int(steps)
+        if not (1 <= steps_int <= 100):
+            raise HTTPException(status_code=400, detail="steps must be between 1 and 100")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="steps must be an integer")
+
+    try:
+        guidance_float = float(guidance)
+        if not (0.0 <= guidance_float <= 20.0):
+            raise HTTPException(status_code=400, detail="guidance must be between 0.0 and 20.0")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="guidance must be a number")
+
     # Validate scale
-    if scale not in (2, 4):
+    if scale_int not in (2, 4):
         raise HTTPException(status_code=400, detail="scale must be 2 or 4")
 
-    if scale not in pipelines:
+    if scale_int not in pipelines:
         available = ", ".join(str(s) for s in sorted(pipelines.keys()))
         raise HTTPException(
             status_code=400,
-            detail=f"scale {scale} not loaded. Available: {available}",
+            detail=f"scale {scale_int} not loaded. Available: {available}",
         )
 
     # Read and validate image
@@ -167,10 +192,10 @@ async def upscale_image(
         raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
 
     # Get pipeline
-    pipe = pipelines[scale]
+    pipe = pipelines[scale_int]
 
     # Log request
-    print(f"Upscaling {input_image.size[0]}×{input_image.size[1]} → ×{scale}")
+    print(f"Upscaling {input_image.size[0]}×{input_image.size[1]} → ×{scale_int}")
 
     # Upscale
     try:
@@ -179,9 +204,9 @@ async def upscale_image(
             image=input_image,
             prompt=prompt,
             negative_prompt=negative_prompt,
-            seed=seed,
-            steps=steps,
-            guidance=guidance,
+            seed=seed_int,
+            steps=steps_int,
+            guidance=guidance_float,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upscaling failed: {e}")

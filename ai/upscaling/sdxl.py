@@ -203,30 +203,35 @@ def upscale(
         new_seed() if seed == 0 else seed
     )
 
-    with torch.inference_mode():
-        if isinstance(pipe, StableDiffusionUpscalePipeline):
-            # ×4 upscaler - prompt-guided
-            result = pipe(
-                prompt=prompt if prompt else "high quality, detailed",
-                negative_prompt=negative_prompt,
-                image=input_image,
-                num_inference_steps=steps,
-                guidance_scale=guidance,
-                generator=generator,
-            )
-        else:
-            # ×2 latent upscaler
-            result = pipe(
-                prompt=prompt if prompt else "high quality",
-                negative_prompt=negative_prompt,
-                image=input_image,
-                num_inference_steps=steps,
-                guidance_scale=guidance,
-                generator=generator,
-            )
+    try:
+        with torch.inference_mode():
+            if isinstance(pipe, StableDiffusionUpscalePipeline):
+                # ×4 upscaler - prompt-guided
+                result = pipe(
+                    prompt=prompt if prompt else "high quality, detailed",
+                    negative_prompt=negative_prompt,
+                    image=input_image,
+                    num_inference_steps=steps,
+                    guidance_scale=guidance,
+                    generator=generator,
+                )
+            else:
+                # ×2 latent upscaler
+                result = pipe(
+                    prompt=prompt if prompt else "high quality",
+                    negative_prompt=negative_prompt,
+                    image=input_image,
+                    num_inference_steps=steps,
+                    guidance_scale=guidance,
+                    generator=generator,
+                )
 
-        output_image = result.images[0]
-        del result
+            output_image = result.images[0]
+            del result
 
-    return output_image
+        return output_image
+    finally:
+        # Clear CUDA cache to prevent memory accumulation between requests
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
