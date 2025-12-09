@@ -29,6 +29,7 @@ from typing import Annotated, Literal
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image
 
@@ -81,6 +82,14 @@ app = FastAPI(
     description="Upscale images using Stable Diffusion ×2 or ×4 upscalers",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
