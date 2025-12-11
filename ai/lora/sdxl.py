@@ -64,14 +64,14 @@ class TrainingConfig:
     model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
 
     # Your dataset
-    train_images_dir: str = "data/images"
-    captions_file: str = "data/captions.jsonl"
+    train_images_dir: str = "input/dataset"
+    captions_file: str = "input/dataset/captions.jsonl"
 
     # Where to save the LoRA weights
-    output_dir: str = "output"
+    output_dir: str = "output/lora"
 
     # Image size - use 768 or 512 if you get OOM errors
-    resolution: int = 768  # 1024 needs ~20GB VRAM, 768 needs ~12GB
+    resolution: int = 1024  # 1024 needs ~20GB VRAM, 768 needs ~12GB
 
     # Training settings
     batch_size: int = 1  # keep tiny for a single consumer GPU
@@ -88,7 +88,7 @@ class TrainingConfig:
     mixed_precision: str = "fp16"  # "fp16" or "bf16" or "no"
 
     # Randomness
-    seed: int | None = 42
+    seed: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -97,27 +97,17 @@ class TrainingConfig:
 
 
 class AestheticDataset(Dataset):
-    """
-    Simple image plus caption dataset backed by a json lines file.
-
-    Each line in captions_file is:
-      {"file_name": "...", "text": "caption ..."}
-
-    Also accepts a regular JSON file (array of objects) as fallback if
-    the .jsonl file doesn't exist.
-    """
-
     def __init__(
         self,
         images_dir: str,
         captions_file: str,
         resolution: int,
     ) -> None:
-        self.images_dir = Path(images_dir)
+        self.images_dir = Path(images_dir).expanduser()
 
         # Read all lines of captions into memory
         records: List[Tuple[str, str]] = []
-        captions_path = Path(captions_file)
+        captions_path = Path(captions_file).expanduser()
 
         # Check if .jsonl exists, otherwise try .json fallback
         if captions_path.exists():
@@ -203,8 +193,13 @@ class AestheticDataset(Dataset):
                 if not line:
                     continue
                 obj = json.loads(line)
-                file_name = obj["file_name"]
-                text = obj["text"]
+                # Support both naming conventions
+                file_name = obj.get("file_name") or obj.get("filename")
+                text = obj.get("text") or obj.get("caption")
+                if not file_name or not text:
+                    raise ValueError(
+                        f"Each entry needs file_name/filename and text/caption keys, got: {obj}"
+                    )
                 records.append((file_name, text))
         return records
 
@@ -428,7 +423,9 @@ def train_lora_sdxl(cfg: TrainingConfig):
 
         suffix = "_interrupted" if is_interrupt else ""
         date_str = end_time.strftime("%Y-%m-%d_%H%M%S")
-        output_path = Path(cfg.output_dir) / f"lora_{date_str}{suffix}"
+        output_path = (
+            Path(cfg.output_dir) / f"lora_{date_str}{suffix}_e{cfg.num_epochs}"
+        )
         os.makedirs(output_path, exist_ok=True)
 
         if is_interrupt:
@@ -438,6 +435,22 @@ def train_lora_sdxl(cfg: TrainingConfig):
 
         # Save using PEFT's save method
         unet.save_pretrained(output_path)
+
+        # Generate custom README with training metadata
+        write_training_readme(
+            output_path=output_path,
+            cfg=cfg,
+            num_images=num_images,
+            completed_epochs=completed_epochs,
+            total_epochs=cfg.num_epochs,
+            elapsed_minutes=elapsed_minutes,
+            start_time=start_time,
+            end_time=end_time,
+            interrupted=is_interrupt,
+            total_steps=total_steps,
+            steps_completed=step_idx,
+        )
+
         print_summary(
             output_path, elapsed_minutes, len(dataloader.dataset), completed_epochs
         )
@@ -634,6 +647,139 @@ def print_summary(
     )
     print("+" + "-" * 58 + "+")
     print()
+
+
+def write_training_readme(
+    output_path: Path,
+    cfg: TrainingConfig,
+    num_images: int,
+    completed_epochs: int,
+    total_epochs: int,
+    elapsed_minutes: float,
+    start_time: datetime,
+    end_time: datetime,
+    interrupted: bool,
+    total_steps: int,
+    steps_completed: int,
+) -> None:
+    """Write a README.md with comprehensive training metadata."""
+
+    status = "INTERRUPTED" if interrupted else "COMPLETE"
+
+    # Get GPU info if available
+    gpu_info = "Unknown"
+    gpu_memory = "Unknown"
+    try:
+        if torch.cuda.is_available():
+            gpu_info = torch.cuda.get_device_name(0)
+            gpu_memory = (
+                f"{torch.cuda.get_device_properties(0).total_memory / (1024**3):.1f} GB"
+            )
+    except Exception:
+        pass
+
+    # Get library versions
+    try:
+        import diffusers
+
+        diffusers_version = diffusers.__version__
+    except Exception:
+        diffusers_version = "Unknown"
+
+    try:
+        import peft
+
+        peft_version = peft.__version__
+    except Exception:
+        peft_version = "Unknown"
+
+    try:
+        torch_version = torch.__version__
+    except Exception:
+        torch_version = "Unknown"
+
+    readme_content = f"""# SDXL LoRA Training Output
+
+## Training Status: {status}
+
+## Quick Start
+
+```python
+from ai.text2image.sdxl import make_pipe, snap
+
+pipe = make_pipe(lora_path="{output_path}")
+image = snap(pipe, prompt="your prompt here", lora_scale=0.8)
+```
+
+## Training Summary
+
+| Metric | Value |
+|--------|-------|
+| Status | {status} |
+| Training Started | {start_time.strftime("%Y-%m-%d %H:%M:%S")} |
+| Training Ended | {end_time.strftime("%Y-%m-%d %H:%M:%S")} |
+| Total Duration | {elapsed_minutes:.1f} minutes |
+| Epochs Completed | {completed_epochs} / {total_epochs} |
+| Steps Completed | {steps_completed} / {total_steps} |
+
+## Dataset
+
+| Parameter | Value |
+|-----------|-------|
+| Images Directory | `{cfg.train_images_dir}` |
+| Captions File | `{cfg.captions_file}` |
+| Number of Images | {num_images} |
+| Image Resolution | {cfg.resolution}x{cfg.resolution} |
+
+## Training Hyperparameters
+
+| Parameter | Value |
+|-----------|-------|
+| Base Model | `{cfg.model_id}` |
+| Learning Rate | {cfg.learning_rate} |
+| Batch Size | {cfg.batch_size} |
+| Total Epochs | {total_epochs} |
+| LoRA Rank | {cfg.lora_rank} |
+| LoRA Alpha | {cfg.lora_rank} |
+| Max Gradient Norm | {cfg.max_grad_norm} |
+| Training Timesteps | {cfg.num_train_timesteps} |
+| Mixed Precision | {cfg.mixed_precision} |
+| Seed | {cfg.seed if cfg.seed is not None else "Random"} |
+
+## LoRA Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Rank (r) | {cfg.lora_rank} |
+| Alpha | {cfg.lora_rank} |
+| Target Modules | `to_k`, `to_q`, `to_v`, `to_out.0` |
+| Init Weights | gaussian |
+
+## Hardware & Environment
+
+| Component | Value |
+|-----------|-------|
+| Device | {cfg.device} |
+| GPU | {gpu_info} |
+| GPU Memory | {gpu_memory} |
+| PyTorch Version | {torch_version} |
+| Diffusers Version | {diffusers_version} |
+| PEFT Version | {peft_version} |
+
+## Files
+
+- `adapter_model.safetensors` - LoRA weights
+- `adapter_config.json` - PEFT adapter configuration
+- `README.md` - This file
+
+## Notes
+
+{"Training was interrupted by user (Ctrl+C). Weights saved at interruption point." if interrupted else "Training completed successfully."}
+"""
+
+    readme_path = output_path / "README.md"
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(readme_content)
 
 
 # ---------------------------------------------------------------------------
