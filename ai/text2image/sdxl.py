@@ -41,18 +41,9 @@ Pose-Copying Usage:
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
-
-# Suppress noisy third-party warnings
-warnings.filterwarnings("ignore", message=".*mediapipe.*")
-warnings.filterwarnings("ignore", message=".*Importing from timm.*")
-warnings.filterwarnings("ignore", message=".*Overwriting tiny_vit.*")
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
-warnings.filterwarnings("ignore", message=".*Defaulting to unsafe serialization.*")
-warnings.filterwarnings("ignore", message=".*upcast_vae.*is deprecated.*")
 
 import torch
 from diffusers import (
@@ -434,7 +425,7 @@ def snap(
     steps: int = 20,
     guidance: float = 4.5,
     pose: Pose | None = None,
-    lora_scale: float = 1.0,
+    lora_scale: float | None = None,
 ) -> Image:
     """
     Generate an image from a text prompt, optionally conditioned on a pose.
@@ -512,9 +503,12 @@ def snap(
         new_seed() if seed == 0 else seed
     )
 
-    # Pass LoRA scale via cross_attention_kwargs instead of set_adapters
-    # set_adapters fails with inference mode tensors
-    cross_attention_kwargs = {"scale": lora_scale} if lora_scale != 1.0 else None
+    cross_attention_kwargs = None
+
+    if lora_scale is not None:
+        # Pass LoRA scale via cross_attention_kwargs instead of set_adapters
+        # set_adapters fails with inference mode tensors
+        cross_attention_kwargs = {"scale": lora_scale}
 
     with torch.inference_mode():
         if is_pose_mode:
